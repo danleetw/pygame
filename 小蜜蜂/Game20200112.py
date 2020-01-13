@@ -117,6 +117,18 @@ class Bee():
             self.y=y
             self.y_dist=random.randint(0,10)
             
+            #行進方向
+            self.sx=0
+            self.sy=0
+            
+            #停留狀況
+            self.MoveMode=0
+            self.MoveStep=0
+            self.MoveDelay=0
+            self.MaxMoveDelay=1
+            
+            
+            
             #---目前顯示動作(0,1,2)
             self.showmode=0
             
@@ -144,14 +156,48 @@ class Bee():
         
 #----首腦---敵人運動模式控制
 class BeesBrain():
-    def __init__(self,bees):
+    def __init__(self,bees,spaceship):
         self.bees_direct=1 #---1 Right, 2 Left
+        
+        
+        
         self.bees_move=300   #已移動次數
         self.bees_max_move=600
         self.bees=bees
+        self.spaceship=spaceship
+        
+        
+        
         self.downfloorcnt=0
         self.naxdownfloorcnt=600
         self.downfloorflag=False
+        
+        self.MoveArray=list()
+        self.MoveArray.append((999,999))
+        self.MoveArray.append( ((0,-1),(0,-1),(0,-1),(0,-1),(0,-1),(0,-1),\
+                                (0,-1),(0,-1),(0,-1),(0,-1),(0,-1),(0,-1),\
+                                (0,-1),(0,-1),(0,-1),(0,-1),(0,-1),(0,-1),\
+                                (0,-1),(0,-1),(0,-1),(0,-1),(0,-1),(0,-1),\
+                                (0,-1),(0,-1),(0,-1),(0,-1),(0,-1),(0,-1),\
+                                (0,-1),(0,-1),(0,-1),(0,-1),(0,-1),(0,-1),\
+                                (1,-1),(1,-1),(1,-1),(1,-1),(1,-1),(1,-1),\
+                                (1,-1),(1,-1),(1,-1),(1,-1),(1,-1),(1,-1),\
+                                (1,-1),(1,-1),(1,-1),(1,-1),(1,-1),(1,-1),\
+                                (1,0),(1,0),(1,0),(1,0),(1,0),(1,0),\
+                                (1,0),(1,0),(1,0),(1,0),(1,0),(1,0),\
+                                (1,0),(1,0),(1,0),(1,0),(1,0),(1,0),\
+                                (1,0),(1,0),(1,0),(1,0),(1,0),(1,0),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
+                                (999,999),) )
         
     #----簡易左右模式    
     def move(self):
@@ -162,23 +208,117 @@ class BeesBrain():
                 self.bees_direct=2
             else:
                 self.bees_direct=1
-                
+        #if len(self.bees)>0:         
+        #   rnd_bee=random.randint(0,len(self.bees)-1)
+        #   #print(rnd_bee)
+        #   self.bees[rnd_bee].MoveMode=1
+        
+        
         for id,bee in enumerate(self.bees):
-            bee.x=bee.x+pow(-1,self.bees_direct)*0.42
-            if self.downfloorflag==True:
-                bee.y=bee.y+5
-                print(bee.y)
-                if bee.y>800:
-                   self.bees.pop(id)
-        self.downfloorflag=False
+            
+            #----停留模式
+            if bee.MoveMode==0:
                 
+                
+                bee.x=bee.x+pow(-1,self.bees_direct)*0.42
+                #------下移一排
+                if self.downfloorflag==True:
+                    rnd_bee=random.randint(0,len(self.bees)-1) 
+                    #self.bees[rnd_bee].MoveMode=1
+                    
+                    bee.y=bee.y+5
+                    #print(bee.y)
+                    if bee.y>800:
+                       self.bees.pop(id)
+            elif bee.MoveMode==1 :
+                self.move1(bee) 
+                
+                
+        #if move_cnt.get(1,0)==2:
+           #print("Active 1")
+           #rnd_bee=random.randint(0,len(self.bees)-1) 
+           #self.bees[rnd_bee].MoveMode=1
+            
+        
+        
+        #self.move1(self.bees[0]) 
+        
+        self.downfloorflag=False
+        
+    def GetMovecnt(self):
+        ret=dict()
+        
+        for bee in self.bees:
+            ret[bee.MoveMode]=ret.get(bee.MoveMode,0)+1
+        return ret    
+            
+    def move1(self,bee):
+        if (bee.live==False) or (bee.MoveMode!=1):
+            return False
+        
+        delay=1000
+        #print("MoveMode:",bee.MoveMode)
+        #print("MoveArr:",len(self.MoveArray[0]))
+        
+        bee.MoveDelay=bee.MoveDelay+1
+        if bee.MoveDelay>bee.MaxMoveDelay:
+            bee.MoveDelay=0
+            bee.MoveStep=bee.MoveStep+1
+        
+            #----依照預設軌跡走     
+            if bee.MoveStep<len(self.MoveArray[bee.MoveMode]):
+               #movearr=self.MoveArray[bee.MoveMode]
+               #x,y= movearr[bee.MoveStep]
+               x,y= self.MoveArray[bee.MoveMode][bee.MoveStep]
+               if x!=999 and y!=999:
+                   bee.x=bee.x+x
+                   bee.y=bee.y+y
+                   if bee.x>1200:
+                       bee.x=-30
+               #else:
+               #    #input("A")
+               #    bee.MoveMode=1
+               #    bee.MoveStep=0
+            else:#-----如果沒有決定去向
+                if (bee.sx==0 and bee.sy==0) or (250 > bee.y>200) or (420 > bee.y>400):
+                    #---調整追蹤機率
+                    if random.randint(0,12)<2:
+                        x=self.spaceship.x-bee.x
+                        y=self.spaceship.y-bee.y
+                        
+                        print(x/y)
+                        bee.sx=x/y
+                        while abs(bee.sx)<0.8 and bee.y<300:
+                            bee.sx=bee.sx*2
+                    else:
+                        bee.sx=pow(-1,random.randint(1,3))
+                    bee.sy=1
+                
+                bee.x=bee.x+bee.sx
+                bee.y=bee.y+bee.sy
+        if bee.y>800:
+            bee.y=-30
+        if bee.x<0:
+            bee.x=1200
+        if bee.x>1200:
+            bee.x=0
+        pass   
     #--- 密蜂策略選擇
     def think(self):
         self.downfloorcnt=self.downfloorcnt+1
         if self.downfloorcnt>self.naxdownfloorcnt:
            self.downfloorcnt=0 
-           self.downfloorflag=True    
+           self.downfloorflag=True  
+           
+        move_cnt=self.GetMovecnt()
+        
         self.move()
+        
+        
+        #print("Move Cnt:",move_cnt)
+        if move_cnt.get(1,0)==0 and len(self.bees)>0:
+           rnd_bee=random.randint(0,len(self.bees)-1)  
+           self.bees[rnd_bee].MoveMode=1 
         pass
 
 
@@ -195,7 +335,8 @@ class SpaceShip():
         self.lastshoot=None
         #datetime.datetime.now()+datetime.timedelta(microseconds=self.shot_delay)
         
-        self.x=random.randint(1,1200-100)
+        #self.x=random.randint(1,1200-100)
+        self.x=1000
         self.y=800-100
         self.y_dist=random.randint(0,10)
 
@@ -274,7 +415,8 @@ class SpaceShip():
 class Score():
     def __init__(self,screen):
         self.screen=screen
-        self.font = pygame.font.SysFont('宋體', 32, True)
+        self.font = pygame.font.SysFont('arial', 32, True)
+        
         
         self.hiscore=0
         
@@ -310,7 +452,7 @@ class Score():
                    self.stageclear=False
                    self.stagecleartime=None
            if self.stageclear ==True:          
-               font = pygame.font.SysFont('宋體', 52, True)
+               font = pygame.font.SysFont('arial', 52, True)
                
                #surface1 = font.render('STAGE CLEAR', True, [255,255, 255])
                surface1 = font.render('STAGE CLEAR', True, [random.randint(0,255),random.randint(0,255), random.randint(0,255)])
@@ -422,10 +564,9 @@ def MainProgram():
     
     #載入音效
     sound=Sound()
-    sound.load_sound("shoot","D:/PauLee/bullet.wav",0.2)
-    sound.load_sound("boom","D:/PauLee/boom.wav",0.2)  
-    #sound.load_bgm("BeesStart.mp3",0.3,1)
-    #sound.load_bgm("music.mp3",0.1,-1)
+    sound.load_sound("shoot","bullet.wav",0.2)
+    sound.load_sound("boom","boom.wav",0.2)  
+
 
     #設定太空船       
     player=SpaceShip(screen,sound)
@@ -457,7 +598,7 @@ def MainProgram():
            #---重建蜜蜂群
            bees=MakeBees(screen,bee_x_no,bee_y_no)
            #給蜂群戰略
-           beesbrain=BeesBrain(bees)
+           beesbrain=BeesBrain(bees,player)
            
            
            
