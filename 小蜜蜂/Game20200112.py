@@ -30,11 +30,13 @@ class Bullet():
         
         #子彈圖片
         playerImg=pygame.image.load("Bullet.png")
-        self.width=10
-        self.playerImg = pygame.transform.scale(playerImg, (self.width, 20))
+        self.width=5
+        self.height=10
+        self.playerImg = pygame.transform.scale(playerImg, (self.width, self.height))
         
         self.x=500
-        self.y=700 #子彈由下方射出
+        self.y_init=740
+        self.y=self.y_init #子彈由下方射出
         self.shoot_flag=False
         self.ready=True
         
@@ -99,7 +101,7 @@ class Bullet():
             self.y=self.y-2
             if self.y<1:
                  self.shoot_flag=False
-                 self.y=700
+                 self.y=self.y_init
 
 
 #-----蜜蜂模組                 
@@ -125,7 +127,8 @@ class Bee():
             self.MoveMode=0
             self.MoveStep=0
             self.MoveDelay=0
-            self.MaxMoveDelay=1
+            #----減慢蜜蜂速度
+            self.MaxMoveDelay=2
             
             
             
@@ -198,6 +201,12 @@ class BeesBrain():
                                 (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
                                 (1,1),(1,1),(1,1),(1,1),(1,1),(1,1),\
                                 (999,999),) )
+        #-----最多同時移動蜜蜂
+        self.max_nextmove=9
+        #-----下次移動時間
+        self.nextmove_dist=6
+        self.nextmove=datetime.datetime.now()+datetime.timedelta(seconds=self.nextmove_dist)
+        
         
     #----簡易左右模式    
     def move(self):
@@ -316,10 +325,13 @@ class BeesBrain():
         
         
         #print("Move Cnt:",move_cnt)
-        if move_cnt.get(1,0)==0 and len(self.bees)>0:
-           rnd_bee=random.randint(0,len(self.bees)-1)  
-           self.bees[rnd_bee].MoveMode=1 
-        pass
+        print(self.nextmove,datetime.datetime.now())
+        if self.nextmove<datetime.datetime.now():
+            if move_cnt.get(1,0)<self.max_nextmove and len(self.bees)>0:
+               rnd_bee=random.randint(0,len(self.bees)-1)  
+               self.bees[rnd_bee].MoveMode=1 
+               self.nextmove=datetime.datetime.now()+datetime.timedelta(seconds=self.nextmove_dist)
+            pass
 
 
 #------Space Ship 太空船模組
@@ -330,23 +342,33 @@ class SpaceShip():
 
         #載入太空船照片
         playerImg=pygame.image.load("ROCKET.png")
-        self.playerImg = pygame.transform.scale(playerImg, (50, 100))
+        self.playerImg = pygame.transform.scale(playerImg, (30, 60))
         self.shot_delay=450
         self.lastshoot=None
         #datetime.datetime.now()+datetime.timedelta(microseconds=self.shot_delay)
         
         #self.x=random.randint(1,1200-100)
         self.x=1000
-        self.y=800-100
+        self.y=800-self.playerImg.get_rect()[3]
         self.y_dist=random.randint(0,10)
-
+        
+        self.gothit=0
+        self.max_gothit=1
 
         self.rock_gun=Bullet(screen) #---這顆不會射出，只是表示子彈目前是否可發射
         #====建立飛彈倉        
         self.bullets=list()
         #-----多顆飛彈
-        for b in range(5):
+        for b in range(2):
             self.bullets.append(Bullet(screen))
+            
+            
+        #---Get Rect
+        self.rect=self.playerImg.get_rect()
+        self.rect[0]=self.x
+        self.rect[1]=self.y
+        #print(self.rect)
+        #input("A")
         
     #-----
     #def up(self):
@@ -378,7 +400,7 @@ class SpaceShip():
         
         #----逐一檢查彈倉是否可發射
         for i in self.bullets:
-            if i.shoot(self.x+25)==True:
+            if i.shoot(self.x+self.rect[2]/2)==True:
                self.sound.play_sound("shoot")
                #發射，並設定要稍後才能再次發射
                self.lastshoot=datetime.datetime.now()+datetime.timedelta(microseconds=self.shot_delay)
@@ -395,14 +417,21 @@ class SpaceShip():
     def draw(self):
         self.screen.blit(self.playerImg,(self.x,self.y))
         
+        
+        if self.gothit>self.max_gothit:
+            print("SpaceShip hit")
+        
         #---畫出飛彈在太空船上
         if self.shootable():
-            self.rock_gun.drawgun(self.x+19,self.y-5)
+            self.rock_gun.drawgun(self.x+self.rect[2]/2-4,self.y-5)
         
         #Draw Bullet
         for bullet in self.bullets:
             bullet.draw()
-            
+        
+        self.rect[0]=self.x
+        self.rect[1]=self.y
+        
         #self.shoot()
         #==True:
             
@@ -414,11 +443,27 @@ class SpaceShip():
 #----顯示得分狀況及過關說明
 class Score():
     def __init__(self,screen):
+        self.show_delay=list()
+        
         self.screen=screen
+        self.sfont = pygame.font.SysFont('arial', 16, True)
         self.font = pygame.font.SysFont('arial', 32, True)
         
+        #載入太空船照片
+        self.boomImg=pygame.image.load("boom.png")
+        self.boomImg = pygame.transform.scale(self.boomImg, (50, 100))
         
         self.hiscore=0
+        
+        try:
+            with open('hiscore.ini', 'r', encoding='UTF-8') as file:
+                for line in file:
+                    #print(line)
+                    self.hiscore=int(line)
+                    break
+        except:
+            print("Err")
+            self.hiscore=0
         
         self.score=list()
         self.score.append(0)
@@ -426,7 +471,20 @@ class Score():
         
         self.stageclear=False
         self.stagecleartime=None
-        
+    def writescore(self,score):
+         #try:
+            with open('hiscore.ini', 'w', encoding='UTF-8') as file:
+                 file.write(str(score))
+                    
+         #except:
+         #   print("Write Err")
+         #   self.hiscore=0
+    def showhit(self,x,y):
+        self.screen.blit(self.boomImg,(x,y))
+        self.show_delay.append([self.boomImg,(x,y),30])
+        surface1 = self.sfont.render(u'100', True, [255, 255, 255])
+        self.show_delay.append([surface1,(x,y),30])
+        #self.screen.blit(surface1, [x, y])
     def show(self):
         #----Show 1UP的分數
         surface1 = self.font.render(u'1UP', True, [255, 255, 255])
@@ -444,6 +502,7 @@ class Score():
         
         #-----Show Stage Clear
         if self.stageclear==True:
+           self.writescore(self.hiscore)
            #顯示三秒鐘
            if self.stagecleartime==None:
               self.stagecleartime=datetime.datetime.now()+datetime.timedelta(seconds=5)
@@ -457,7 +516,18 @@ class Score():
                #surface1 = font.render('STAGE CLEAR', True, [255,255, 255])
                surface1 = font.render('STAGE CLEAR', True, [random.randint(0,255),random.randint(0,255), random.randint(0,255)])
                self.screen.blit(surface1, [500, 400])
-        
+        #-----Show Delay
+        #if len(self.show_delay)>0:
+        for i,obj in enumerate(self.show_delay):
+            #print(obj[0])
+            self.screen.blit(obj[0], obj[1])
+            print(obj[2])
+            obj[2]=obj[2]-1
+            #obj[2]=obj[2]-1
+            if obj[2]<=0:
+                self.show_delay.pop(i)
+                #print(obj[2])
+            #print(obj)
     #----增加分數    
     def add_score(self,player=0,score=0):
         self.score[player]=self.score[player]+score
@@ -527,8 +597,24 @@ def CheckCollect(sound,rocket,bees,score):
                        score.add_score(0,100)
                        bees.pop(id)
                        print("BOOM!!")
+                       
+                       score.showhit(bee.x-bee.rect[2]/2,bee.y-bee.rect[3]/2)
+                       
+                       
     #需再檢查太空船跟蜜蜂及蜜蜂的飛彈                  
-               
+    for id,bee in enumerate(bees):
+         if bee.live:
+            #print(bee.rect,rocket.rect) 
+            if pygame.Rect.colliderect(rocket.rect,bee.rect):
+                sound.play_sound("boom")
+                score.add_score(0,100)
+                bees.pop(id)
+                score.showhit(bee.x+10,bee.y+10)
+                bee.gothit=bee.gothit+1
+                rocket.gothit=rocket.gothit+1
+                
+                
+             
 
 #---生成蜜蜂群
 def MakeBees(screen,x=8,y=5):
@@ -622,16 +708,16 @@ def MainProgram():
                    #player.right()
                elif event.key==pygame.K_SPACE:
                    space_key_down=True
-                   #player.shoot()
+                   player.shoot()
             elif event.type==pygame.KEYUP:
                if event.key==pygame.K_LEFT:
                    left_key_down=False
                elif event.key==pygame.K_RIGHT:
                    right_key_down=False
                elif event.key==pygame.K_SPACE:
-                   #space_key_down=False    
-                   if len(bees)>0:
-                      player.shoot() 
+                   space_key_down=False    
+                   #if len(bees)>0:
+                   #   player.shoot() 
                 
         if left_key_down==True:
             player.left()
